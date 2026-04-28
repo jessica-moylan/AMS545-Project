@@ -2,9 +2,9 @@
 Represents a directed line segment (left-endpoint --> right-endpoint) and are canonically ordered. with left having smaller x and ties broken by y
 """
 
-from typing import Any, Optional
+from typing import Any
 
-from vector import Vector
+from graph.vector import Vector
 
 def compare_points(a: Vector, b: Vector) -> int:
     """
@@ -27,7 +27,7 @@ class Segment:
         self,
         p1: Vector,
         p2: Vector,
-        face: Optional[Any] = None,
+        face: Any | None = None,
     ) -> None:
         
         if compare_points(p1, p2) <= 0:
@@ -37,8 +37,8 @@ class Segment:
             self.l_point = p2
             self.r_point = p1
 
-        self.face_a: Optional[Any] = face
-        self.face_b: Optional[Any] = None
+        self.face_a: Any | None = face
+        self.face_b: Any | None = None
 
     @classmethod
     def from_coords(
