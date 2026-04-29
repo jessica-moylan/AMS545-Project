@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from graph.vector import Vector
     from graph.node import Leaf
 
-
 class Trapezoid:
     """A single cell in the trapezoidal map."""
 

@@ -10,11 +10,11 @@ _SHEAR = math.sqrt(2) - 1.0
 
 
 def _shear_vec(p: Vector) -> Vector:
-    return Vector(p.x + _SHEAR * p.y, p.y)
+    return Vector(p.x + _SHEAR, p.y)
 
 
 def _shear_x(x: float, y: float) -> float:
-    return x + _SHEAR * y
+    return x + _SHEAR
 
 
 def _cmp_xy(x: float, y: float, b: Vector) -> int:

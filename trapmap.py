@@ -28,25 +28,9 @@ from graph.vector import Vector
 from graph.segment import Segment
 from graph.trapezoid import Trapezoid
 from graph.node import Leaf, Node, XNode, YNode
-from utils import _shear_vec, _shear_x, _cmp_xy, _above, _above2, _lower_link, _upper_link, _collect_leaves, _flood_face, _make_leaf, _point_in_polygon, _above_xy
-
-# --------------------------------------------------------------------------- #
-# Irrational shear factor – removes all degeneracies (shared x-coordinates,
-# vertical segments) while preserving topology.
-# --------------------------------------------------------------------------- #
-_SHEAR = math.sqrt(2) - 1.0
-
-
-# =========================================================================== #
-# TrapMap
-# =========================================================================== #
+from utils import _SHEAR, _shear_vec, _shear_x, _cmp_xy, _above, _above2, _lower_link, _upper_link, _collect_leaves, _flood_face, _make_leaf, _point_in_polygon, _above_xy
 
 class TrapMap:
-    """Trapezoidal map and point-location search structure."""
-
-    # ------------------------------------------------------------------ #
-    # Construction
-    # ------------------------------------------------------------------ #
 
     def __init__(
         self,
@@ -54,20 +38,19 @@ class TrapMap:
         step_callback: Callable[["TrapMap", int, Segment], None] | None = None,
         shuffle: bool = True,
     ) -> None:
-        """Build from a collection of non-crossing line segments.
+        """
 
         Parameters
         ----------
         segments:
-            Non-crossing line segments (interiors disjoint; endpoints may
-            coincide to form closed figures).
+            Non-crossing line segments 
         step_callback:
-            Optional hook called after every segment insertion with signature
-            ``callback(trapmap, step_index, segment)``.  Use this for
-            incremental visualisation.
+            Optional, called after every segment insertion with signature
+            ``callback(trapmap, step_index, segment)``.  
         shuffle:
+            Default: True
             Randomise insertion order for O(n log n) expected construction.
-            Set ``False`` only for reproducible tests.
+
         """
         if segments is None:
             raise ValueError("segments cannot be None")
@@ -78,10 +61,8 @@ class TrapMap:
         self._right_bound: Vector | None = None
         self._step_callback = step_callback
 
-        # De-duplicate
         unique = segments if isinstance(segments, set) else set(segments)
 
-        # Shear-copy (never mutate user segments)
         sheared: List[Segment] = []
         for s in unique:
             if s is None:
@@ -93,14 +74,13 @@ class TrapMap:
 
         self._build(sheared, shuffle)
 
-    # Build from polygons
     @classmethod
     def from_polygons(
         cls,
         polygons: List[List[Vector]],
         step_callback: Callable | None = None,
         shuffle: bool = True,
-    ) -> "TrapMap":
+    ) -> TrapMap:
         """Build a trapezoidal map from a list of polygonal faces.
 
         Each polygon is a ``List[Vector]`` giving its vertices in order.
@@ -407,9 +387,8 @@ class TrapMap:
                 _lower_link(bot_arr[-1], old_right.get_lower_right_neighbor())
                 _upper_link(top_arr[-1], old_right.get_upper_right_neighbor())
 
-        # Create leaf nodes (deduplicate merged trapezoids)
-        top_leaf: List[Leaf | None] = [None] * n
-        bot_leaf: List[Leaf | None] = [None] * n
+        top_leaf = [None] * n
+        bot_leaf = [None] * n
 
         for j in range(n):
             if j == 0 or top_arr[j] is not top_arr[j - 1]:
@@ -427,7 +406,7 @@ class TrapMap:
                 bot_leaf[j] = bot_leaf[j - 1]
 
         # Build DAG sub-trees and replace old leaves
-        new_nodes: List[Node | None] = [None] * n
+        new_nodes = [None] * n
         for j in range(n):
             yy = YNode(seg)
 
@@ -453,7 +432,7 @@ class TrapMap:
             yy.set_left_child(top_leaf[j])  
             yy.set_right_child(bot_leaf[j]) 
 
-            # Replace old leaf(ves) in the DAG
+            # Replace old leaf in the DAG
             for parent in intersected[j].get_parent_nodes():
                 if parent.left_child is intersected[j]:
                     parent.set_left_child(new_nodes[j])
@@ -461,9 +440,7 @@ class TrapMap:
                     parent.set_right_child(new_nodes[j]) 
 
     def _replace_leaf(self, leaf: Leaf, new_node: Node) -> None:
-        """Swap *leaf* out of the DAG, inserting *new_node* in its place."""
         if leaf.parent_node is None:
-            # Leaf is the current root
             self._root = new_node
         else:
             for parent in leaf.get_parent_nodes():
@@ -473,7 +450,7 @@ class TrapMap:
                     parent.set_right_child(new_node)
 
     def _follow_segment(self, seg: Segment) -> List[Leaf]:
-        """Return the ordered list of leaves (trapezoids) intersected by *seg*."""
+        """Return the ordered list of leaves intersected by *seg*."""
         result: List[Leaf] = []
         prev = self._find_point(seg.left_point, seg)
         result.append(prev)
@@ -494,15 +471,15 @@ class TrapMap:
 
         return result
 
-    def _find_point(self, p: Vector, s: Segment) -> Leaf:
-        """Traverse the DAG to find the leaf containing *p* (with segment context)."""
+    def _find_point(self, vector: Vector, s: Segment) -> Leaf:
+        """Traverse the DAG to find the leaf containing this vector p."""
         current: Node = self._root 
         while not isinstance(current, Leaf):
             if isinstance(current, XNode):
-                val = _cmp_xy(p.x, p.y, current.data)
+                val = _cmp_xy(vector.x, vector.y, current.data)
                 current = current.left_child if val < 0 else current.right_child 
             else:  # YNode, above/below test with slope tie-break
-                if _above2(p, current.data, s):
+                if _above2(vector, current.data, s):
                     current = current.left_child 
                 else:
                     current = current.right_child 
@@ -510,43 +487,38 @@ class TrapMap:
 
     # Query methods
     def find_nearest_trapezoid(self, x: float, y: float) -> Trapezoid:
-        """Return the trapezoid that contains *(x, y)*, or the nearest one."""
+        """Return the trapezoid that contains (x, y) or the nearest one."""
         return self._query_sheared(_shear_x(x, y), y)
 
     def find_containing_trapezoid(
         self, x: float, y: float
     ) -> Trapezoid | None:
-        """Return the trapezoid that contains *(x, y)*, or ``None``."""
+        """Return the trapezoid that contains (x, y), or None."""
         sx = _shear_x(x, y)
         if (
-            sx < self._left_bound.x   # type: ignore[union-attr]
-            or sx > self._right_bound.x  # type: ignore[union-attr]
-            or y  < self._left_bound.y   # type: ignore[union-attr]
-            or y  > self._right_bound.y  # type: ignore[union-attr]
+            sx < self._left_bound.x  
+            or sx > self._right_bound.x  
+            or y  < self._left_bound.y 
+            or y  > self._right_bound.y  
         ):
             return None
         return self._query_sheared(sx, y)
 
     def find_face_trapezoids(self, x: float, y: float) -> Set[Trapezoid]:
         """Return all trapezoids belonging to the face that contains *(x, y)*."""
-        result: Set[Trapezoid] = set()
+        result= set()
         _flood_face(self.find_containing_trapezoid(x, y), result)
         return result
 
     def find_containing_polygon(self, x: float, y: float) -> Any | None:
-        """Return the polygon that contains *(x, y)*, or ``None``.
-
-        Only meaningful when the map was built from polygons
-        (``TrapMap.from_polygons``).
-        """
-        t = self.find_containing_trapezoid(x, y)
-        if t is None:
+        """Return the polygon that contains (x,y) """
+        trap = self.find_containing_trapezoid(x, y)
+        if trap is None:
             return None
 
-        # Collect candidate polygons by identity
-        seen_ids: Set[int] = set()
-        candidates: List[Any] = []
-        for seg in (t.top_seg, t.bot_seg):
+        seen_ids = set()
+        candidates = []
+        for seg in (trap.top_seg, trap.bot_seg):
             if seg is not None:
                 for face in (seg.face_a, seg.face_b):
                     if face is not None and id(face) not in seen_ids:
@@ -559,7 +531,6 @@ class TrapMap:
         return None
 
     def get_all_trapezoids(self) -> List[Trapezoid]:
-        """Return every non-degenerate trapezoid in the map."""
         if self._trapezoids is None:
             leaves: Set[Leaf] = set()
             visited: Set[int] = set()
@@ -570,11 +541,7 @@ class TrapMap:
                 if not lf.data.has_zero_width() and not lf.data.has_zero_height()
             ]
         return self._trapezoids
-
-    # ------------------------------------------------------------------ #
-    # Internal sheared query
-    # ------------------------------------------------------------------ #
-
+    
     def _query_sheared(self, sx: float, y: float) -> Trapezoid:
         current: Node = self._root 
         while not isinstance(current, Leaf):

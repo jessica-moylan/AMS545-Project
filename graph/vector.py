@@ -9,6 +9,14 @@ class Vector:
         if not isinstance(other, Vector):
             return False
         return self.x == other.x and self.y == other.y
+    
+    def __getitem__(self, index: int) -> float:
+        if index == 0:
+            return self.x
+        elif index == 1:
+            return self.y
+        else:
+            return IndexError(f"index: {index} is out of range")
 
     def __hash__(self) -> int:
         return hash((self.x, self.y))
