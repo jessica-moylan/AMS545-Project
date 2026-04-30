@@ -20,7 +20,7 @@ the map after each segment insertion — useful for incremental visualisation.
 """
 import math
 import random
-from typing import Any, Callable, Collection, List, Set
+from typing import Any, Callable, Collection, Dict, List, Set
 
 from graph.vector import Vector
 from graph.segment import Segment
@@ -58,6 +58,7 @@ class TrapMap:
         self._left_bound: Vector | None = None
         self._right_bound: Vector | None = None
         self._step_callback = step_callback
+        self._polygon_labels: Dict[int, str] | None = None
 
         unique = segments if isinstance(segments, set) else set(segments)
 
@@ -75,17 +76,14 @@ class TrapMap:
     @classmethod
     def from_polygons(
         cls,
-        polygons: List[List[Vector]],
+        polygons: Dict[str, List[Vector]],
         step_callback: Callable | None = None,
         shuffle: bool = True,
-    ) -> TrapMap:
-        """Build a trapezoidal map from a list of polygonal faces.
-
-        Each polygon is a ``List[Vector]`` giving its vertices in order.
-        Polygons may share edges but interiors must not overlap.
-        """
-        seg_map: dict[Segment, Segment] = {}
-        for polygon in polygons:
+    ) -> "TrapMap":
+        seg_map = {}
+        polygon_labels = {}
+        for label, polygon in polygons.items():
+            polygon_labels[id(polygon)] = label
             n = len(polygon)
             for i in range(n):
                 p1 = _shear_vec(polygon[i])
@@ -104,6 +102,7 @@ class TrapMap:
         instance._left_bound = None
         instance._right_bound = None
         instance._step_callback = step_callback
+        instance._polygon_labels = polygon_labels
         instance._build(list(seg_map.values()), shuffle)
         return instance
 
@@ -508,8 +507,8 @@ class TrapMap:
         _flood_face(self.find_containing_trapezoid(x, y), result)
         return result
 
-    def find_containing_polygon(self, x: float, y: float) -> Any | None:
-        """Return the polygon that contains (x,y) """
+    def find_containing_polygon(self, x: float, y: float) -> str | None:
+        """Return the label of the polygon that contains (x, y), or None."""
         trap = self.find_containing_trapezoid(x, y)
         if trap is None:
             return None
@@ -525,6 +524,8 @@ class TrapMap:
 
         for poly in candidates:
             if _point_in_polygon(poly, x, y):
+                if self._polygon_labels is not None:
+                    return self._polygon_labels.get(id(poly))
                 return poly
         return None
 

@@ -58,7 +58,7 @@ class TrapMapVisualizer:
         def _callback(trapmap: TrapMap, _step: int, seg: Segment) -> None:
             self._snapshots.append((list(trapmap.get_all_trapezoids()), seg))
 
-        if isinstance(segments[0], Segment):  # type: ignore[comparison-overlap]
+        if isinstance(segments, list):  # type: ignore[comparison-overlap]
             self._trapmap = TrapMap(segments, step_callback=_callback, shuffle=shuffle)
         else:
             self._trapmap = TrapMap.from_polygons(segments, step_callback=_callback, shuffle=shuffle)
@@ -230,13 +230,12 @@ def _axis_limits(
     if not segments:
         return (-1.0, 1.0), (-1.0, 1.0)
 
-    if isinstance(segments[0], Segment):
+    if isinstance(segments, list):
         xs = [s.left_point.x for s in segments] + [s.right_point.x for s in segments]
         ys = [s.left_point.y for s in segments] + [s.right_point.y for s in segments]
     else:
-        # List of polygons (each polygon is a List[Vector])
-        xs = [v.x for poly in segments for v in poly]
-        ys = [v.y for poly in segments for v in poly]
+        xs = [v.x for poly in segments.values() for v in poly]
+        ys = [v.y for poly in segments.values() for v in poly]
 
     xmin, xmax = min(xs), max(xs)
     ymin, ymax = min(ys), max(ys)
@@ -257,17 +256,8 @@ def visualize_trapmap_construction(
 
 
 if __name__ == "__main__":
-    # demo_segs = [
-    #     # Degeneracy testing
-    #     Segment.from_coords(0,0,100,0),
-    #     Segment.from_coords(0,100,100,100),
-    #     Segment.from_coords(0,0,0,100),
-    #     Segment.from_coords(100,0,100,100),
-    #     Segment.from_coords(25,25,75,25),
-    #     Segment.from_coords(25,25,25,75),
-    #     Segment.from_coords(75,25,75,75),
-    #     Segment.from_coords(25,75,75,75),
-    # ]
-    demo_segs = [Vector(0,0), Vector(50,0), Vector(50,50), Vector(0,50)]   # left square
-
-    visualize_trapmap_construction([demo_segs], title="Trapezoidal Map — Demo", shuffle=True)
+    polygons = {
+    "region_A": [Vector(0,0), Vector(2,0), Vector(2,2), Vector(0,2)],
+    "region_B": [Vector(2,0), Vector(4,0), Vector(4,2), Vector(2,2)],
+    }
+    visualize_trapmap_construction(polygons, title="Trapezoidal Map — Demo", shuffle=True)
