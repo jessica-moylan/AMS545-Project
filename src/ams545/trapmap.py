@@ -18,8 +18,6 @@ get_all_trapezoids()                   every trap in the map
 A ``step_callback(trapmap, step_index, segment)`` may be supplied to observe
 the map after each segment insertion — useful for incremental visualisation.
 """
-from __future__ import annotations
-
 import math
 import random
 from typing import Any, Callable, Collection, List, Set
@@ -28,7 +26,7 @@ from graph.vector import Vector
 from graph.segment import Segment
 from graph.trapezoid import Trapezoid
 from graph.node import Leaf, Node, XNode, YNode
-from utils import _SHEAR, _shear_vec, _shear_x, _cmp_xy, _above, _above2, _lower_link, _upper_link, _collect_leaves, _flood_face, _make_leaf, _point_in_polygon, _above_xy
+from src.ams545.utils import _SHEAR, _shear_vec, _shear_x, _cmp_xy, _above, _above2, _lower_link, _upper_link, _collect_leaves, _flood_face, _make_leaf, _point_in_polygon, _above_xy
 
 class TrapMap:
 

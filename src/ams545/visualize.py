@@ -12,9 +12,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 
 from graph.segment import Segment
+from graph.vector import Vector
 from graph.trapezoid import Trapezoid
-from trapmap import TrapMap
-from utils import _SHEAR
+from src.ams545.trapmap import TrapMap
+from src.ams545.utils import _SHEAR
 
 def _unshear(x: float, y: float) -> Tuple[float, float]:
     """Convert a point from sheared space back to original coordinates."""
@@ -54,10 +55,16 @@ class TrapMapVisualizer:
         self._snapshots: List[Tuple[List[Trapezoid], Segment]] = []
         self._current_step: int = 0
 
-        self._xlim, self._ylim = _axis_limits(segments)
-
         def _callback(trapmap: TrapMap, _step: int, seg: Segment) -> None:
             self._snapshots.append((list(trapmap.get_all_trapezoids()), seg))
+
+        if segments is List[Vector]:  # type: ignore[comparison-overlap]
+            self._trapmap = TrapMap.from_polygons(segments, step_callback=_callback, shuffle=shuffle)
+        else:
+            self._trapmap = TrapMap(segments, step_callback=_callback, shuffle=shuffle)
+
+        self._xlim, self._ylim = _axis_limits(segments)
+
 
         TrapMap(segments, step_callback=_callback, shuffle=shuffle)
 
@@ -74,18 +81,40 @@ class TrapMapVisualizer:
         self._fig, self._ax = plt.subplots(figsize=(10, 7))
         self._fig.patch.set_facecolor("#f8f8f8")
 
-        self._canvas = FigureCanvasTkAgg(self._fig, master=self._root)
-        self._canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+        # Main content area: canvas left, info panel right
+        content = ttk.Frame(self._root)
+        content.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
+        self._canvas = FigureCanvasTkAgg(self._fig, master=content)
+        self._canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        side = ttk.LabelFrame(content, text="Info", padding=8, width=210)
+        side.pack(side=tk.RIGHT, fill=tk.Y, padx=(6, 0))
+        side.pack_propagate(False)
+        
+        cords = ttk.Frame(side)
+        cords.pack(fill=tk.X, pady=(0, 8))
+        self._gps_coords_question = ttk.Label(cords, text="Input GPS coords: ", font=("Arial", 10))
+        self._gps_coords_question.pack(anchor=tk.NW, pady=(0, 8))
+        
+        self._input_gps_coords = ttk.Entry(cords, font=("Arial", 10, "bold"))
+        self._input_gps_coords.insert(tk.END, "45.123, -93.456")  # Placeholder text
+        self._input_gps_coords.pack(fill=tk.X, pady=(0, 8))
+
+        region = ttk.Frame(side)
+        region.pack(fill=tk.X, pady=(0, 8))
+        self._containing_region = ttk.Label(region, text="Containing region: ", font=("Arial", 10))
+        self._containing_region.pack(anchor=tk.NW, pady=(0, 8))
+
+        self._containing_region_answer = ttk.Label(region, text="", wraplength=200, font=("Arial", 10, "bold"))
+        self._containing_region_answer.pack(anchor=tk.NW, pady=(0, 8))
+        
         # --- Navigation bar ---
         bar = ttk.Frame(self._root)
         bar.pack(fill=tk.X, padx=10, pady=(0, 10))
 
         self._btn_prev = ttk.Button(bar, text="Previous", command=self._go_prev)
         self._btn_prev.pack(side=tk.LEFT, padx=4)
-
-        self._step_label = ttk.Label(bar, text="", font=("Helvetica", 11))
-        self._step_label.pack(side=tk.LEFT, expand=True)
 
         self._btn_next = ttk.Button(bar, text="Next", command=self._go_next)
         self._btn_next.pack(side=tk.RIGHT, padx=4)
@@ -97,6 +126,7 @@ class TrapMapVisualizer:
         self._root.bind("<Left>",  lambda _e: self._go_prev())
         self._root.bind("<Right>", lambda _e: self._go_next())
         self._root.bind("<Escape>", lambda _e: self.quit())
+        self._root.bind("<Return>", lambda _e: self.get_cordinates())
 
     def _go_prev(self) -> None:
         if self._current_step > 0:
@@ -179,9 +209,16 @@ class TrapMapVisualizer:
         self._canvas.draw()
 
         n = len(self._snapshots)
-        self._step_label.config(text=f"Step {step + 1} of {n}")
         self._btn_prev.state(["disabled"] if step == 0       else ["!disabled"])
         self._btn_next.state(["disabled"] if step == n - 1  else ["!disabled"])
+
+    def get_cordinates(self) -> Tuple[str, str]:
+        input_coords = self._input_gps_coords.get()
+        x, y = input_coords.split(",")
+        x, y = float(x.strip()), float(y.strip())
+        result = self._trapmap.find_containing_polygon(x, y)
+        self._containing_region_answer.config(text=str(result) if result is not None else "Not found")
+        return input_coords, result
 
     def run(self) -> None:
         """Start the Tkinter event loop """
