@@ -224,6 +224,13 @@ class TrapMapVisualizer:
         self._root.quit()
         self._root.destroy()
 
+def _iter_verts(val):
+    if val and isinstance(val[0], list):
+        for poly in val:
+            yield from poly
+    else:
+        yield from val
+
 def _axis_limits(
     segments, pad_frac: float = 0.15
 ) -> Tuple[Tuple[float, float], Tuple[float, float]]:
@@ -234,8 +241,8 @@ def _axis_limits(
         xs = [s.left_point.x for s in segments] + [s.right_point.x for s in segments]
         ys = [s.left_point.y for s in segments] + [s.right_point.y for s in segments]
     else:
-        xs = [v.x for poly in segments.values() for v in poly]
-        ys = [v.y for poly in segments.values() for v in poly]
+        xs = [v.x for val in segments.values() for v in _iter_verts(val)]
+        ys = [v.y for val in segments.values() for v in _iter_verts(val)]
 
     xmin, xmax = min(xs), max(xs)
     ymin, ymax = min(ys), max(ys)
@@ -257,7 +264,27 @@ def visualize_trapmap_construction(
 
 if __name__ == "__main__":
     polygons = {
-    "region_A": [Vector(0,0), Vector(2,0), Vector(2,2), Vector(0,2)],
-    "region_B": [Vector(2,0), Vector(4,0), Vector(4,2), Vector(2,2)],
+        "region_A": [
+            [Vector(0,0),  Vector(2,0),  Vector(2,3),  Vector(0,3)],
+            [Vector(7,9),  Vector(10,9), Vector(10,12), Vector(7,12)],
+        ],
+        "region_B": [Vector(2,0),  Vector(5,0),  Vector(5,4),  Vector(2,3)],
+        "region_C": [Vector(5,0),  Vector(7,0),  Vector(7,3),  Vector(5,4)],
+        "region_D": [Vector(7,0),  Vector(10,0), Vector(10,3), Vector(7,3)],
+        "region_E": [Vector(0,3),  Vector(2,3),  Vector(2,6),  Vector(0,6)],
+        "region_F": [Vector(2,3),  Vector(5,4),  Vector(5,6),  Vector(2,6)],
+        "region_G": [Vector(5,4),  Vector(7,3),  Vector(7,6),  Vector(5,6)],
+        "region_H": [Vector(7,3),  Vector(10,3), Vector(10,6), Vector(7,6)],
+        "region_I": [Vector(0,6),  Vector(2,6),  Vector(2,9),  Vector(0,9)],
+        "region_J": [Vector(2,6),  Vector(5,6),  Vector(5,9),  Vector(2,9)],
+        "region_K": [
+            [Vector(5,6),  Vector(7,6),  Vector(7,9),  Vector(5,9)],
+            [Vector(7,6),  Vector(10,6), Vector(10,9), Vector(7,9)],
+        ],
+        "region_L": 
+            [[Vector(0,9),  Vector(2,9),  Vector(2,12), Vector(0,12)],
+            [Vector(2,9),  Vector(5,9),  Vector(5,12), Vector(2,12)]
+        ],
+        "region_M": [Vector(5,9),  Vector(7,9),  Vector(7,12), Vector(5,12)],
     }
     visualize_trapmap_construction(polygons, title="Trapezoidal Map — Demo", shuffle=True)

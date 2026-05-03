@@ -82,19 +82,25 @@ class TrapMap:
     ) -> "TrapMap":
         seg_map = {}
         polygon_labels = {}
-        for label, polygon in polygons.items():
-            polygon_labels[id(polygon)] = label
-            n = len(polygon)
-            for i in range(n):
-                p1 = _shear_vec(polygon[i])
-                p2 = _shear_vec(polygon[(i + 1) % n])
-                s = Segment(p1, p2, polygon)
-                if s not in seg_map:
-                    seg_map[s] = s
-                else:
-                    existing = seg_map[s]
-                    if existing.face_a is not polygon:
-                        existing.face_b = polygon
+        for label, polygon_or_list in polygons.items():
+            if polygon_or_list and isinstance(polygon_or_list[0], list):
+                sub_polygons = polygon_or_list
+            else:
+                sub_polygons = [polygon_or_list]
+
+            for polygon in sub_polygons:
+                polygon_labels[id(polygon)] = label
+                n = len(polygon)
+                for i in range(n):
+                    p1 = _shear_vec(polygon[i])
+                    p2 = _shear_vec(polygon[(i + 1) % n])
+                    s = Segment(p1, p2, polygon)
+                    if s not in seg_map:
+                        seg_map[s] = s
+                    else:
+                        existing = seg_map[s]
+                        if existing.face_a is not polygon:
+                            existing.face_b = polygon
 
         instance = cls.__new__(cls)
         instance._root = None

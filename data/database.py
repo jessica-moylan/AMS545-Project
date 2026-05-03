@@ -7,7 +7,7 @@ load_dotenv()
 
 postgres_user = os.getenv("POSTGRES_USER")
 postgres_password = os.getenv("POSTGRES_PASSWORD")
-postgres_db = os.getenv("POSTGRES_DB", "gis")
+postgres_db = os.getenv("POSTGRES_DB")
 
 engine = create_engine(
     f"postgresql://{postgres_user}:{postgres_password}@localhost:5432/{postgres_db}"
@@ -45,6 +45,7 @@ with engine.begin() as conn:
     bad_count = result.scalar()
 
     # Clean the coverage by fixing gaps, overlaps, and mismatched edges
+    conn.execute(text("DROP TABLE IF EXISTS world_biomes_clean"))
     conn.execute(text("""
         CREATE TABLE world_biomes_clean AS
         SELECT
@@ -55,7 +56,7 @@ with engine.begin() as conn:
             "REALM",
             "COLOR",
             "LICENSE",
-            ST_CoverageClean(geometry, -1, 0.001) OVER () AS geometry
+            ST_CoverageClean(geometry, -1, 0.09) OVER () AS geometry
         FROM world_biomes
     """))
 
@@ -71,6 +72,7 @@ with engine.begin() as conn:
 
     # Simplify the clean coverage
     # tolerance in degrees (~0.001 ≈ 100m); increase for more aggressive simplification
+    conn.execute(text("DROP TABLE IF EXISTS world_biomes_simplified"))
     conn.execute(text("""
         CREATE TABLE world_biomes_simplified AS
         SELECT
@@ -81,6 +83,7 @@ with engine.begin() as conn:
             "REALM",
             "COLOR",
             "LICENSE",
-            ST_CoverageSimplify(geometry, 0.001) OVER () AS geometry
+            ST_CoverageSimplify(geometry, 0.09) OVER () AS geometry
         FROM world_biomes_clean
     """))
+    print("finish post-processing")
