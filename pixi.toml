@@ -5,7 +5,7 @@ platforms = ["linux-64", "win-64"]
 version = "0.1.0"
 
 [tasks]
-postgres = "docker exec -it postgis_db psql -U postgres -d gis"
+postgres = "docker exec -it postgis_db psql -U jmoylan -d gis"
 demo = "PYTHONPATH=$PYTHONPATH:. python src/ams545/visualize.py"
 database = "python data/database.py"
 

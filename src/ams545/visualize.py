@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 import matplotlib
-matplotlib.use("TkAgg")
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg

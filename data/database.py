@@ -1,5 +1,6 @@
 import os
 import geopandas as gpd
+import urllib.request   
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
@@ -8,6 +9,11 @@ load_dotenv()
 postgres_user = os.getenv("POSTGRES_USER")
 postgres_password = os.getenv("POSTGRES_PASSWORD")
 postgres_db = os.getenv("POSTGRES_DB")
+
+# ST_CoverageSimplify uses the layer CRS units. This dataset is in EPSG:4326,
+# so convert the target tolerance from kilometers to approximate degrees.
+SIMPLIFY_TOLERANCE_KM = 30
+KM_PER_DEGREE = 111.32
 
 engine = create_engine(
     f"postgresql://{postgres_user}:{postgres_password}@localhost:5432/{postgres_db}"
@@ -19,7 +25,6 @@ url = "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_count
 world = gpd.read_file(url)
 sa_boundary = world[world['ADMIN'] == 'New Zealand']
 boundry = gpd.clip(gdf, sa_boundary)
-print("finish pre-processing")
 
 with engine.begin() as conn:
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
@@ -70,34 +75,32 @@ with engine.begin() as conn:
     """))
     still_bad = result.scalar()
 
-    # Simplify the clean coverage
-    # tolerance in degrees (~0.001 ≈ 100m); increase for more aggressive simplification
+    # Simplify the clean coverage.
+    # Tolerance is in degrees here because the geometries are stored in EPSG:4326.
     conn.execute(text("DROP TABLE IF EXISTS world_biomes_simplified"))
     conn.execute(text("""
         CREATE TABLE world_biomes_simplified AS
         SELECT
             "OBJECTID",
+            "ECO_NAME",
+            "BIOME_NUM",
             "BIOME_NAME",
-            ST_CoverageSimplify(geometry, 0.09) OVER () AS geometry
+            "REALM",
+            "COLOR",
+            "LICENSE",
+            ST_CoverageSimplify(geometry, :simplify_tolerance) OVER () AS geometry
         FROM world_biomes_clean
-    """))
-    conn.execute(text("DROP TABLE IF EXISTS world_biomes_merged"))
-    conn.execute(text("""
-        CREATE TABLE world_biomes_merged AS
-        SELECT
-            "OBJECTID",
-            "BIOME_NAME",
-            ST_CoverageUnion(geometry) AS geometry
-        FROM world_biomes_clean
-    """))
+    """), {"simplify_tolerance": SIMPLIFY_TOLERANCE_KM / KM_PER_DEGREE})
     conn.execute(text("DROP TABLE IF EXISTS world_biomes_final"))
     conn.execute(text("""
+        CREATE TABLE world_biomes_final AS
         SELECT
-        ROW_NUMBER() OVER (ORDER BY "BIOME_NAME") AS cartodb_id,
-        "BIOME_NAME" AS biome_name,
-        ST_Multi(ST_Union(geometry)) AS the_geom,
-        ST_Transform(ST_Multi(ST_Union(geometry)), 3857) AS the_geom_webmercator
+            ROW_NUMBER() OVER (ORDER BY "BIOME_NAME") AS cartodb_id,
+            "BIOME_NAME" AS biome_name,
+            ST_Multi(ST_Union(geometry)) AS the_geom,
+            ST_Transform(ST_SetSRID(ST_Multi(ST_Union(geometry)), 4326), 3857) AS the_geom_webmercator
         FROM world_biomes_simplified
-        GROUP BY "BIOME_NAME";
+        GROUP BY "BIOME_NAME"
     """))
+    
     print("finish post-processing")
