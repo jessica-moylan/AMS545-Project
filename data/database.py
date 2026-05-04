@@ -17,7 +17,7 @@ gdf = gpd.read_file("data/Ecoregions2017.shp")
 
 url = "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip"
 world = gpd.read_file(url)
-sa_boundary = world[world['CONTINENT'] == 'South America']
+sa_boundary = world[world['ADMIN'] == 'New Zealand']
 boundry = gpd.clip(gdf, sa_boundary)
 print("finish pre-processing")
 
@@ -77,13 +77,27 @@ with engine.begin() as conn:
         CREATE TABLE world_biomes_simplified AS
         SELECT
             "OBJECTID",
-            "ECO_NAME",
-            "BIOME_NUM",
             "BIOME_NAME",
-            "REALM",
-            "COLOR",
-            "LICENSE",
             ST_CoverageSimplify(geometry, 0.09) OVER () AS geometry
         FROM world_biomes_clean
+    """))
+    conn.execute(text("DROP TABLE IF EXISTS world_biomes_merged"))
+    conn.execute(text("""
+        CREATE TABLE world_biomes_merged AS
+        SELECT
+            "OBJECTID",
+            "BIOME_NAME",
+            ST_CoverageUnion(geometry) AS geometry
+        FROM world_biomes_clean
+    """))
+    conn.execute(text("DROP TABLE IF EXISTS world_biomes_final"))
+    conn.execute(text("""
+        SELECT
+        ROW_NUMBER() OVER (ORDER BY "BIOME_NAME") AS cartodb_id,
+        "BIOME_NAME" AS biome_name,
+        ST_Multi(ST_Union(geometry)) AS the_geom,
+        ST_Transform(ST_Multi(ST_Union(geometry)), 3857) AS the_geom_webmercator
+        FROM world_biomes_simplified
+        GROUP BY "BIOME_NAME";
     """))
     print("finish post-processing")

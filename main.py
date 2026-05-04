@@ -16,7 +16,7 @@ engine = create_engine(
     f"postgresql://{postgres_user}:{postgres_password}@localhost:5432/{postgres_db}"
 )
 
-sql = "SELECT * FROM world_biomes"
+sql = "SELECT * FROM world_biomes_final"
 gdf = gpd.read_postgis(sql, con=engine, geom_col='geometry') 
 print("finished loading data from PostGIS")
 
